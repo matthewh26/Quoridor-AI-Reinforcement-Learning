@@ -1,1 +1,2 @@
-# Quoridor-AI-Reinforcement-Learning
+# QuoridorAI: Reinforcement Learning
+
