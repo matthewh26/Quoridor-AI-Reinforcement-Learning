@@ -1,6 +1,5 @@
 import numpy as np
 import pygame
-import torch
 
 pygame.init()
 
@@ -18,6 +17,10 @@ class board():
         self.walls_hor = np.zeros((8,9))
         self.vertices = np.zeros((8,8))
 
+        self.vert_wall_positions = []
+        self.hor_wall_positions = []
+        self.vertex_positions = []
+
 
 class player(pygame.sprite.Sprite):
     def __init__(self, player_num, image):
@@ -29,10 +32,16 @@ class player(pygame.sprite.Sprite):
         else:
             self.start_pos = [8,4]
         self.reset_player()
+        self.set_x_y()
 
     def reset_player(self):
         self.walls = 10
         self.position = self.start_pos
+        self.reward = 0
+
+    def set_x_y(self):
+        self.x = (self.position[1]*75) + 84
+        self.y = (self.position[0]*75) + 84
 
 
 class QuoridorGame():
@@ -61,39 +70,83 @@ class QuoridorGame():
         self.board.reset_board()
         self.p1.reset_player()
         self.p2.reset_player()
+        self.board.squares[self.p1.position] = 1
+        self.board.squares[self.p2.position] = 2
         self.turn = 0
         self.turn_player = self.players[self.turn]
 
     def place_wall(self, wall_direction, locations):
-    #put down a wall on the board
+        #put down a wall on the board
         if wall_direction == 'v':
             self.board.walls_vert[locations[0]] = 1
             self.board.walls_vert[locations[1]] = 1
+            self.board.vert_wall_positions.append(locations[0])
+            self.board.vert_wall_positions.append(locations[1])
         elif wall_direction == 'h':
             self.board.walls_hor[locations[0]] = 1
             self.board.walls_hor[locations[1]] = 1
+            self.board.hor_wall_positions.append(locations[0])
+            self.board.hor_wall_positions.append(locations[1])
         self.board.vertices[locations[0]] = 1
+        self.board.vertex_positions.append(locations[0])
         self.turn_player.walls -= 1
+    
+    def remove_wall(self, wall_direction, locations):
+        #pick a wall back up from the board
+        if wall_direction == 'v':
+            self.board.walls_vert[locations[0]] = 0
+            self.board.walls_vert[locations[1]] = 0
+            self.board.vert_wall_positions.remove(locations[0])
+            self.board.vert_wall_positions.remove(locations[1])
+        elif wall_direction == 'h':
+            self.board.walls_hor[locations[0]] = 0
+            self.board.walls_hor[locations[1]] = 0
+            self.board.hor_wall_positions.remove(locations[0])
+            self.board.hor_wall_positions.remove(locations[1])
+        self.board.vertices[locations[0]] = 0
+        self.board.vertex_positions.remove(locations[0])
+        self.turn_player.walls += 1
+
 
     def move_piece(self,direction):
         #move turn player's piece
         self.squares[self.turn_player.position] = 0
-        self.turn_player.position += direction #NEEDS IMRPOVEMENT
-        self.squares[self.turn_player.position] = self.turn_player + 1
+        self.turn_player.position += direction 
+        self.turn_player.set_x_y()
+        self.squares[self.turn_player.position] = self.turn + 1
 
-    def play_step(self,action):
+
+    def play_step(self,movetype,direction=None,locations=None):
         #check for quit
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 pygame.quit()
                 quit()
+        
+        #make move
+        if 'wall' in movetype:
+            wall_direction = movetype[0]
+            self.place_wall(wall_direction,locations)
+        else:
+            self.move_piece(direction)
+
         #update game board
         self.render()
 
+        #check if game over
+        game_over = False
+        if self.p1.position[0] == 8 or self.p2.position[0] == 0:
+            game_over = True
+            winner = self.turn_player.player
+            self.turn_player.reward = 10
+            self.players[(self.turn + 1) % 2].reward = -10
+            return game_over, self.p1.reward, self.p2.reward
+
         #set it to be the other players turn
         self.turn += 1
-        self.turn = self.turn % 2
-        self.turn_player = self.players[self.turn]
+        self.turn_player = self.players[self.turn % 2]
+
+        return game_over, self.p1.reward, self.p2.reward
 
     def render(self):
         #load current game state into pygame display
@@ -101,73 +154,159 @@ class QuoridorGame():
             for j in np.linspace(80,680,9):
                 square = pygame.Rect(i,j,40,40)
                 pygame.draw.rect(self.display,(255,255,255),square)
-        self.display.blit(self.p1.image, (384,84))
-        self.display.blit(self.p2.image, (384,684))
+        self.display.blit(self.p1.image, (self.p1.x,self.p1.y))
+        self.display.blit(self.p2.image, (self.p2.x,self.p2.y))
+        #draw the walls
+        for wall in self.board.hor_wall_positions:
+            wall_x = (wall[1]*75) + 70
+            wall_y = (wall[0]*75) + 130
+            wall_piece = pygame.Rect(wall_x,wall_y,60,15)
+            pygame.draw.rect(self.display,(181, 101, 29), wall_piece)
+        for wall in self.board.vert_wall_positions:
+            wall_x = (wall[1]*75) + 130
+            wall_y = (wall[1]*75) + 70
+            wall_piece =  pygame.Rect(wall_x,wall_y,12.5,60)
+            pygame.draw.rect(self.display,(181, 101, 29), wall_piece)
+        #draw vertex blockers
+        for vertex in self.board.vertex_positions:
+            vertex_x = (vertex[1]*75) + 130
+            vertex_y = (vertex[0]*75) + 130
+            vertex_piece =  pygame.Rect(vertex_x,vertex_y,15,15)
+            vertex_piece = pygame.draw.rect(self.display,(181,101,29),vertex_piece)
+        
         pygame.display.update()
-
-    def legal_moves(self):
-        #returns a move_vector representing the action space, move_vector_n = 1 
-        #indicates that the move represented by move_vector_n is legal
-        move_vector = np.zeros(140)
-        n=0
-        #vertical wall places
-        for i in range(8):
-            for j in range(8):
-                #checks if the wall spaces are free
-                free_check = self.board.walls_vert[i,j] == 0 and self.board.walls_vert[i+1,j] == 0
-                #checks if the wall would cross a horizontal wall
-                cross_check = self.board.vertices[i,j] == 0
-                #checks if the wall space is protected due to the blocking constraint
-                '''NEED TO CHECK IF THE WALLS BLOCKS A PLAYER OFF'''
-                is_not_protected = True         
-                if free_check and cross_check and is_not_protected:
-                    move_vector[n] = 1
-                    n += 1                      
-        #horizontal wall places
-        for i in range(8):
-            for j in range(8):
-                #checks if the wall spaces are free
-                free_check = self.board.walls_hor[i,j] == 0 and self.board.walls_hor[i,j+1] == 0
-                #checks if the wall would cross a horizontal wall
-                cross_check = self.board.vertices[i,j] == 0
-                #checks if the wall space is protected due to the blocking constraint
-                '''NEED TO CHECK IF THE WALLS BLOCKS A PLAYER OFF'''
-                is_not_protected = True  
-                if free_check and cross_check and is_not_protected:
-                    move_vector[n] = 1
-                    n += 1
-        #normal piece move - check not either at edge or blocked by a wall
-        pos = self.turn_player.position
-        if pos[0] != 0 and self.board.walls_hor[pos] == 0: #backwards move
-            move_vector[n] = 1
-            n += 1
-        if pos[0] != 9 and self.board.walls_hor[(pos[0],pos[1]-1)] == 0: #forwards move
-            move_vector[n] = 1
-            n += 1
-        if self.turn_player.position[1] != 0: #left move
-            move_vector[n] = 1
-            n += 1
-        if self.turn_player.position[1] != 9: #right move
-            move_vector[n] = 1
-            n += 1
-        #double piece move
-        #diagonal piece move
-
-        return move_vector
+ 
 
 
+    
+def is_legal(self,movetype,direction=None,locations=None):
+    #checks if the chosen move is a legal move
+    if locations is not None:
+        i = locations[0]
+        j = locations[1]
+    if 'wall' in movetype:
+        wall_direction = movetype[0]
+        if self.turn_player.walls == 0:
+            return False
+    pos = self.turn_player.position
+    
+    #wall moves
+    if movetype == 'vertical wall':
+        #checks if the wall spaces are free
+        free_check = self.board.walls_vert[i,j] == 0 and self.board.walls_vert[i+1,j] == 0
+        #checks if the wall would cross a horizontal wall
+        cross_check = self.board.vertices[i,j] == 0
+        if free_check and cross_check:
+            pass
+        else:
+            return False
+        #checks if the wall space is protected due to the blocking constraint
+        not_protected_check = not self.is_protected('v',((i,j),(i+1,j)))     
+        if not_protected_check:
+            return True
+        else:
+            return False
+    elif movetype == 'horizontal wall':
+        #checks if the wall spaces are free
+        free_check = self.board.walls_hor[i,j] == 0 and self.board.walls_hor[i,j+1] == 0
+        #checks if the wall would cross a horizontal wall
+        cross_check = self.board.vertices[i,j] == 0
+        if free_check and cross_check:
+            pass
+        else:
+            return False
+        #checks if the wall space is protected due to the blocking constraint
+        not_protected_check = not self.is_protected('h',((i,j),(i,j+1)))
+        if not_protected_check:
+            return True
+        else:
+            return False
+    #normal piece move - check not either at edge or blocked by a wall or player piece
+    elif movetype == 'regular move':
+        if direction == (1,0): #downwards move
+            if pos[0] != 8 and self.board.walls_hor[pos] == 0 and self.board.squares[pos[0]+1,pos[1]] == 0:
+                return True
+            else:
+                return False
+        elif direction == (-1,0): #upwards move
+            if pos[0] != 0 and self.board.walls_hor[(pos[0],pos[1]-1)] == 0 and self.board.squares[pos[0]-1,pos[1]] == 0:
+                return True
+            else:
+                return False
+        elif direction == (0,1): #right move
+            if self.turn_player.position[1] != 8 and self.board.walls_vert[pos] == 0 and self.board.squares[pos[0], pos[1]+1] == 0:
+                return True
+            else: 
+                return False
+        else: #left move
+            if self.turn_player.position[1] != 0 and self.board.walls_vert[pos[0],pos[1]-1] == 0 and self.board.squares[pos[0], pos[1]-1] == 0:
+                return True
+            else:
+                return False
+    #double piece move - check at least two spaces from edge and is blocked by player piece and not blocked by walls 1 or 2 spaces away
+    elif movetype == 'straight jump':                      
+        return False
+    #diagonal piece move - check not at least 2 spaces from edge, and blocked by player with wall piece behind
+    #NB: FOR EACH DIAGONAL MOVE, THERE ARE TWO WAYS TO ACHIEVE - (eg. diag down left blocked by player down or to the left)
+    elif movetype == 'diagonal jump':
+        return False
 
+def is_protected(self,wall_direction,locations):
+    #check whether a wall location is protected by the blocking constraint
+    protected = False
+    self.place_wall(wall_direction,locations)
+    for player in self.players:
+        if find_route(player) is not None:
+            pass
+        else:
+            protected = True
+    self.remove_wall(wall_direction, locations)
+    return protected
+    
+
+def find_route(self,player):
+    #maze search to find the quickest route for the player to the finish
+    #will return None if there is no possible route to the finish
+    route = None
+    grid = set_grid(self.board)
+    route = search(self.turn_player.position[0],self.turn_player.position[1],grid)
+    return route
+
+def search(self,x,y,grid):
+    #searches for a possible route from a given x and y to the goal side of a grid
+    if grid[(x,y)] == 2:
+        return True
+    else:
+        grid[(x,y)] = 1
+    
+    
+    search(x+1,y,grid)
+    pass
+
+def set_grid(self,board):
+    #sets up a grid to use for the search algorithm
+    grid = np.zeros((9,9))
+    if self.turn % 2 == 0:
+        grid[8,:] = 2
+    else:
+        grid[0,:] = 2
+    return grid
+
+
+'''
 if __name__ == '__main__':
 
-    #create board and players
     env = board()
-    p1 = player(1,'white_pawn.png')
-    p2 = player(2,'blue_pawn.png')
-    game = QuoridorGame( p1, p2, env)
-    
-    while True:
-        game.play_step()
+    p1 = player(1, 'blue_pawn.png')
+    p2 = player(2, 'white_pawn.png')
+    game = QuoridorGame(p1, p2, env)
+    game.board.hor_wall_positions.append((0,3))
+    game.board.hor_wall_positions.append((0,4))
+    game.board.vertex_positions.append((0,3))
 
+    while True:
+        game.play_step('wall')
+'''
 
 
 
