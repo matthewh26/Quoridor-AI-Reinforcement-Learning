@@ -110,10 +110,10 @@ class QuoridorGame():
 
     def move_piece(self,direction):
         #move turn player's piece
-        self.squares[self.turn_player.position] = 0
+        self.board.squares[self.turn_player.position] = 0
         self.turn_player.position += direction 
         self.turn_player.set_x_y()
-        self.squares[self.turn_player.position] = self.turn + 1
+        self.board.squares[self.turn_player.position] = self.turn_player.player
 
 
     def play_step(self,movetype,direction=None,locations=None):
@@ -146,7 +146,7 @@ class QuoridorGame():
         self.turn += 1
         self.turn_player = self.players[self.turn % 2]
 
-        return game_over, self.p1.reward, self.p2.reward
+        return self.p1.reward, self.p2.reward
 
     def render(self):
         #load current game state into pygame display
@@ -256,41 +256,48 @@ def is_protected(self,wall_direction,locations):
     protected = False
     self.place_wall(wall_direction,locations)
     for player in self.players:
-        if find_route(player) is not None:
+        if find_route(player):
             pass
         else:
             protected = True
     self.remove_wall(wall_direction, locations)
     return protected
-    
 
-def find_route(self,player):
-    #maze search to find the quickest route for the player to the finish
-    #will return None if there is no possible route to the finish
-    route = None
-    grid = set_grid(self.board)
-    route = search(self.turn_player.position[0],self.turn_player.position[1],grid)
-    return route
 
-def search(self,x,y,grid):
-    #searches for a possible route from a given x and y to the goal side of a grid
-    if grid[(x,y)] == 2:
-        return True
-    else:
-        grid[(x,y)] = 1
-    
-    
-    search(x+1,y,grid)
-    pass
-
-def set_grid(self,board):
+def set_grid(player):
     #sets up a grid to use for the search algorithm
     grid = np.zeros((9,9))
-    if self.turn % 2 == 0:
+    if player.player == 1:
         grid[8,:] = 2
     else:
         grid[0,:] = 2
     return grid
+    
+def find_route(player):
+    #maze search to find the quickest route for the player to the finish
+    #will return None if there is no possible route to the finish
+    grid = set_grid(player)
+    route = search(player.position[0],player.position[1],grid)
+    return route
+
+def search(self,i,j,grid):
+    #searches for a possible route from a given x and y to the goal side of a grid
+    if grid[(i,j)] == 2: #2 = reached the other side
+            return True
+    elif grid[(i,j)] == 3: #3 = already visited square
+        return False
+    
+    grid[(i,j)] = 3 #set square to visited
+    
+    if (((i > 0) and (self.board.hor_walls[(i-1,j)]==0) and (self.search(i-1,j))) or 
+        ((j < 2) and (self.board.vert_walls[i,j]==0) and self.search(i,j+1)) or 
+        ((i < 2) and (self.board.hor_walls[i,j]==0) and self.search(i+1,j)) or 
+        ((j > 0) and (self.board.vert_walls[(i,j-1)]==0) and self.search(i,j+1))):
+        return True
+    
+    return False
+
+
 
 
 '''
