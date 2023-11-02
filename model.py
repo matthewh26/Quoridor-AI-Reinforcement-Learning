@@ -20,4 +20,19 @@ class Linear_QNet(nn.Module):
         torch.save(model_state, 'model_state_dict.pth')
 
 
+class QTrainer:
+    def __init__(self, model, gamma, lr):
+        self.gamma = gamma
+        self.lr = lr
+        self.model = model
+        self.optimizer = torch.optim.Adam(model.parameters(), lr=self.lr)
+        self.criterion = nn.MSELoss()
+
+    def train_step(self, state, reward, next_state, done):
+        pass
+    
+        
+
+
+
 
