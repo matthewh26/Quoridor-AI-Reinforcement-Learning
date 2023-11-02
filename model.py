@@ -1,6 +1,5 @@
 import torch
 import torch.nn as nn
-from torch.utils.data import Dataset, DataLoader
 import torch.nn.functional as F
 
 class Linear_QNet(nn.Module):
@@ -28,9 +27,27 @@ class QTrainer:
         self.optimizer = torch.optim.Adam(model.parameters(), lr=self.lr)
         self.criterion = nn.MSELoss()
 
-    def train_step(self, state, reward, next_state, done):
-        pass
-    
+    def train_step(self, state, reward, next_state, game_over):
+        state = torch.tensor(state, dtype=torch.float)
+        next_state = torch.tensor(next_state, dtype=torch.float)
+        reward= torch.tensor(reward, dtype=torch.float)
+        action = torch.tensor(action, dtype=torch.long)
+
+        pred = self.model(state)
+
+        target = pred.clone()
+        for idx in range(len(game_over)):
+            Q_new = reward[idx]
+            if not game_over[idx]:
+                Q_new = reward[idx] + self.gamma * torch.max(self.model(next_state[idx]))
+
+            target[idx][torch.argmax(action[idx]).item()] = Q_new
+        
+        self.optimizer.zero_grad()
+        loss = self.criterion(target, pred)
+        loss.backward()
+        self.optimizer.step()
+
         
 
 
