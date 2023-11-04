@@ -36,7 +36,10 @@ class player(pygame.sprite.Sprite):
 
     def reset_player(self):
         self.walls = 10
-        self.position = self.start_pos
+        if self.player == 1:
+            self.position = [0,4]
+        else:
+            self.position = [8,4]
         self.reward = 0
 
     def set_x_y(self):
@@ -70,8 +73,8 @@ class QuoridorGame():
         self.board.reset_board()
         self.p1.reset_player()
         self.p2.reset_player()
-        self.board.squares[self.p1.position] = 1
-        self.board.squares[self.p2.position] = 2
+        self.board.squares[self.p1.position[0], self.p1.position[1]] = 1
+        self.board.squares[self.p2.position[0], self.p2.position[1]] = 2
         self.turn = 0
         self.turn_player = self.players[self.turn]
 
@@ -110,10 +113,11 @@ class QuoridorGame():
 
     def move_piece(self,direction):
         #move turn player's piece
-        self.board.squares[self.turn_player.position] = 0
-        self.turn_player.position += direction 
+        self.board.squares[self.turn_player.position[0], self.turn_player.position[1]] = 0
+        self.turn_player.position[0] += direction[0]
+        self.turn_player.position[1] += direction[1]
         self.turn_player.set_x_y()
-        self.board.squares[self.turn_player.position] = self.turn_player.player
+        self.board.squares[self.turn_player.position[0], self.turn_player.position[1]] = self.turn_player.player
 
 
     def play_step(self,movetype,direction=None,locations=None):
@@ -132,11 +136,11 @@ class QuoridorGame():
 
         #update game board
         self.render()
-        pygame.time.delay(500)
+        pygame.time.delay(100)
 
         #check if game over
         game_over = False
-        if self.p1.position[0] == 8 or self.p2.position[0] == 0 or self.turn > 500:
+        if self.p1.position[0] == 8 or self.p2.position[0] == 0 or self.turn > 200:
             game_over = True
             self.turn_player.reward = 10
             self.players[(self.turn + 1) % 2].reward = -10
@@ -151,6 +155,9 @@ class QuoridorGame():
         return game_over, self.p1.reward, self.p2.reward
 
     def render(self):
+        #clear display
+        self.display.fill((40,40,40))
+
         #load current game state into pygame display
         for i in np.linspace(80,680,9): #board steps of 75 pixels
             for j in np.linspace(80,680,9):
@@ -166,8 +173,8 @@ class QuoridorGame():
             pygame.draw.rect(self.display,(181, 101, 29), wall_piece)
         for wall in self.board.vert_wall_positions:
             wall_x = (wall[1]*75) + 130
-            wall_y = (wall[1]*75) + 70
-            wall_piece =  pygame.Rect(wall_x,wall_y,12.5,60)
+            wall_y = (wall[0]*75) + 70
+            wall_piece =  pygame.Rect(wall_x,wall_y,15,60)
             pygame.draw.rect(self.display,(181, 101, 29), wall_piece)
         #draw vertex blockers
         for vertex in self.board.vertex_positions:
@@ -181,9 +188,9 @@ class QuoridorGame():
     def get_action_vars(self, move_num):
         if move_num < 64:
             movetype = 'vertical wall'
-            locations = [(int(np.floor(move_num/8)),move_num % 8),(int(np.floor(move_num/8)),(move_num % 8)+1)]
+            locations = [(int(np.floor(move_num/8)),move_num % 8),(int((np.floor(move_num/8))+1),move_num % 8)]
             direction = None
-        if move_num >= 64 and move_num < 127:
+        if move_num >= 64 and move_num < 128:
             movetype = 'horizontal wall'
             move_num -= 64
             locations = [(int(np.floor(move_num/8)),move_num % 8),(int(np.floor(move_num/8)),(move_num % 8)+1)] #TO DO: check this is correct
@@ -214,8 +221,6 @@ class QuoridorGame():
             movetype, direction = 'diagonal jump', (1,1)
         if move_num == 139:
             movetype, direction = 'diagonal jump', (1,-1)
-        print(movetype)
-        print(locations)
         return movetype, direction, locations
 
         
@@ -264,29 +269,29 @@ class QuoridorGame():
         #normal piece move - check not either at edge or blocked by a wall or player piece
         elif movetype == 'regular move':
             if direction == (1,0): #downwards move
-                if pos[0] != 8 and self.board.walls_hor[pos] == 0 and self.board.squares[pos[0]+1,pos[1]] == 0:
+                if pos[0] != 8 and self.board.walls_hor[pos[0],pos[1]] == 0 and self.board.squares[pos[0]+1,pos[1]] == 0:
                     return True
                 else:
                     return False
             elif direction == (-1,0): #upwards move
-                if pos[0] != 0 and self.board.walls_hor[(pos[0],pos[1]-1)] == 0 and self.board.squares[pos[0]-1,pos[1]] == 0:
+                if pos[0] != 0 and self.board.walls_hor[(pos[0]-1,pos[1])] == 0 and self.board.squares[pos[0]-1,pos[1]] == 0:
                     return True
                 else:
                     return False
             elif direction == (0,1): #right move
-                if self.turn_player.position[1] != 8 and self.board.walls_vert[pos] == 0 and self.board.squares[pos[0], pos[1]+1] == 0:
+                if pos[1] != 8 and self.board.walls_vert[pos[0],pos[1]] == 0 and self.board.squares[pos[0], pos[1]+1] == 0:
                     return True
                 else: 
                     return False
             else: #left move
-                if self.turn_player.position[1] != 0 and self.board.walls_vert[pos[0],pos[1]-1] == 0 and self.board.squares[pos[0], pos[1]-1] == 0:
+                if pos[1] != 0 and self.board.walls_vert[pos[0],pos[1]-1] == 0 and self.board.squares[pos[0], pos[1]-1] == 0:
                     return True
                 else:
                     return False
         #double piece move - check at least two spaces from edge and is blocked by player piece and not blocked by walls 1 or 2 spaces away
         elif movetype == 'straight jump':    
             if direction == (2,0):
-                if pos[0] > 7 and self.board.squares[pos[0]+1,pos[1]] != 0 and self.board.walls_hor[pos] == 0 and self.board.walls_hor[pos[0]+1, pos[1]] == 0:
+                if pos[0] < 7 and self.board.squares[pos[0]+1,pos[1]] != 0 and self.board.walls_hor[pos[0],pos[1]] == 0 and self.board.walls_hor[pos[0]+1, pos[1]] == 0:
                     return True
                 else:
                     return False   
@@ -302,7 +307,6 @@ class QuoridorGame():
         protected = False
         self.place_wall(wall_direction,locations)
         for player in self.players:
-            print(player)
             if self.find_route(player):
                 pass
             else:

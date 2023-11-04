@@ -24,7 +24,7 @@ class agent():
         return state
     
     def get_action(self, state, game):
-        self.epsilon = 150 - self.number_of_games
+        self.epsilon = 200 - self.number_of_games
         final_move = np.zeros(140)
             
         if np.random.randint(0,200) < self.epsilon:
