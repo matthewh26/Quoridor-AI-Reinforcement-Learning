@@ -32,7 +32,6 @@ class player(pygame.sprite.Sprite):
         else:
             self.start_pos = [8,4]
         self.reset_player()
-        self.set_x_y()
 
     def reset_player(self):
         self.walls = 10
@@ -41,6 +40,7 @@ class player(pygame.sprite.Sprite):
         else:
             self.position = [8,4]
         self.reward = 0
+        self.set_x_y()
 
     def set_x_y(self):
         self.x = (self.position[1]*75) + 84
@@ -136,7 +136,7 @@ class QuoridorGame():
 
         #update game board
         self.render()
-        pygame.time.delay(100)
+        pygame.time.delay(10)
 
         #check if game over
         game_over = False
@@ -144,7 +144,7 @@ class QuoridorGame():
             game_over = True
             self.turn_player.reward = 10
             self.players[(self.turn + 1) % 2].reward = -10
-            if self.turn > 500 and not (self.p1.position[0] == 8 or self.p2.position[0] == 0) :
+            if self.turn > 200 and not (self.p1.position[0] == 8 or self.p2.position[0] == 0) :
                 self.turn_player.reward = -10
             return game_over, self.p1.reward, self.p2.reward
 

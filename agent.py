@@ -13,21 +13,25 @@ class agent():
     def __init__(self, player):
         self.number_of_games = 0
         self.epsilon = 0 #randomness
-        self.gamma = 0 #discount rate
+        self.gamma = 0.9 #discount rate
         self.memory = deque(maxlen=MAX_MEMORY) #popleft()
         self.model = model.Linear_QNet(290,140,500)
         self.trainer = model.QTrainer(self.model, self.gamma, LR)
         self.player = player
+        self.wins = 0
 
     def get_state(self, game):
+        #build game state
         state = np.concatenate([game.board.squares,game.board.walls_vert,game.board.walls_hor,game.board.vertices,self.player], axis=None)
         return state
     
     def get_action(self, state, game):
-        self.epsilon = 200 - self.number_of_games
+        
+        self.epsilon = 200000 - self.number_of_games
         final_move = np.zeros(140)
             
-        if np.random.randint(0,200) < self.epsilon:
+        #epsilon greedy exploration vs exploitation
+        if np.random.randint(0,180000) < self.epsilon:
             move_nums = np.arange(140)
             np.random.shuffle(move_nums)
             for i in range(len(move_nums)):
@@ -54,6 +58,7 @@ class agent():
 
 
     def train_long_memory(self):
+        #create mini sample
         if len(self.memory) > BATCH_SIZE:
             mini_sample = random.sample(self.memory, BATCH_SIZE)
         else:
@@ -63,6 +68,7 @@ class agent():
         self.trainer.train_step(states,actions,rewards,next_states,game_overs)
 
 def train():
+    #set up game environment and agents
     env = board()
     p1 = player(1, 'blue_pawn.png')
     p2 = player(2, 'white_pawn.png')
@@ -103,6 +109,13 @@ def train():
             agent_2.player = (agent_1.player % 2) + 1
             agent_1.number_of_games += 1
             agent_2.number_of_games += 1
+
+            if reward == 10:
+                agent_1.wins += 1
+
+            #print summary stats
+            win_percent = agent_1.wins/agent_1.number_of_games    
+            print(f'game: {agent_1.number_of_games}, wins: {agent_1.wins} win percent: {win_percent}')
         
         else:
 
@@ -122,6 +135,9 @@ def train():
                 agent_2.player = (agent_1.player % 2) + 1
                 agent_1.number_of_games += 1
                 agent_2.number_of_games += 1
+
+                win_percent = agent_1.wins/agent_1.number_of_games   
+                print(f'game: {agent_1.number_of_games}, wins: {agent_1.wins} win percent: {win_percent}')
                 
 
 
