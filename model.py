@@ -27,11 +27,18 @@ class QTrainer:
         self.optimizer = torch.optim.Adam(model.parameters(), lr=self.lr)
         self.criterion = nn.MSELoss()
 
-    def train_step(self, state, reward, next_state, game_over):
+    def train_step(self, state, action, reward, next_state, game_over):
         state = torch.tensor(state, dtype=torch.float)
         next_state = torch.tensor(next_state, dtype=torch.float)
         reward= torch.tensor(reward, dtype=torch.float)
         action = torch.tensor(action, dtype=torch.long)
+
+        if len(state.shape) == 1:
+            state = torch.unsqueeze(state, 0)
+            next_state = torch.unsqueeze(next_state, 0)
+            action = torch.unsqueeze(action, 0)
+            reward = torch.unsqueeze(reward, 0)
+            game_over = (game_over, )
 
         pred = self.model(state)
 

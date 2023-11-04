@@ -122,7 +122,7 @@ class QuoridorGame():
             if event.type == pygame.QUIT:
                 pygame.quit()
                 quit()
-        
+
         #make move
         if 'wall' in movetype:
             wall_direction = movetype[0]
@@ -132,21 +132,23 @@ class QuoridorGame():
 
         #update game board
         self.render()
+        pygame.time.delay(500)
 
         #check if game over
         game_over = False
-        if self.p1.position[0] == 8 or self.p2.position[0] == 0:
+        if self.p1.position[0] == 8 or self.p2.position[0] == 0 or self.turn > 500:
             game_over = True
-            winner = self.turn_player.player
             self.turn_player.reward = 10
             self.players[(self.turn + 1) % 2].reward = -10
+            if self.turn > 500 and not (self.p1.position[0] == 8 or self.p2.position[0] == 0) :
+                self.turn_player.reward = -10
             return game_over, self.p1.reward, self.p2.reward
 
         #set it to be the other players turn
         self.turn += 1
         self.turn_player = self.players[self.turn % 2]
 
-        return self.p1.reward, self.p2.reward
+        return game_over, self.p1.reward, self.p2.reward
 
     def render(self):
         #load current game state into pygame display
@@ -176,126 +178,171 @@ class QuoridorGame():
         
         pygame.display.update()
  
+    def get_action_vars(self, move_num):
+        if move_num < 64:
+            movetype = 'vertical wall'
+            locations = [(int(np.floor(move_num/8)),move_num % 8),(int(np.floor(move_num/8)),(move_num % 8)+1)]
+            direction = None
+        if move_num >= 64 and move_num < 127:
+            movetype = 'horizontal wall'
+            move_num -= 64
+            locations = [(int(np.floor(move_num/8)),move_num % 8),(int(np.floor(move_num/8)),(move_num % 8)+1)] #TO DO: check this is correct
+            direction = None
+        if move_num >= 128:
+            locations = None
+        if move_num == 128:
+            movetype, direction = 'regular move', (-1,0)
+        if move_num == 129:
+            movetype, direction = 'regular move', (0,1)
+        if move_num == 130:
+            movetype, direction = 'regular move', (1,0)
+        if move_num == 131:
+            movetype, direction = 'regular move', (0,-1)
+        if move_num == 132:
+            movetype, direction = 'straight jump', (-2,0)
+        if move_num == 133:
+            movetype, direction = 'straight jump', (0,2)
+        if move_num == 134:
+            movetype, direction = 'straight jump', (2,0)
+        if move_num == 135:
+            movetype, direction = 'straight jump', (0,-2)
+        if move_num == 136:
+            movetype, direction = 'diagonal jump', (-1,-1)
+        if move_num == 137:
+            movetype, direction = 'diagonal jump', (-1,1)
+        if move_num == 138:
+            movetype, direction = 'diagonal jump', (1,1)
+        if move_num == 139:
+            movetype, direction = 'diagonal jump', (1,-1)
+        print(movetype)
+        print(locations)
+        return movetype, direction, locations
 
-
-    
-def is_legal(self,movetype,direction=None,locations=None):
-    #checks if the chosen move is a legal move
-    if locations is not None:
-        i = locations[0]
-        j = locations[1]
-    if 'wall' in movetype:
-        wall_direction = movetype[0]
-        if self.turn_player.walls == 0:
-            return False
-    pos = self.turn_player.position
-    
-    #wall moves
-    if movetype == 'vertical wall':
-        #checks if the wall spaces are free
-        free_check = self.board.walls_vert[i,j] == 0 and self.board.walls_vert[i+1,j] == 0
-        #checks if the wall would cross a horizontal wall
-        cross_check = self.board.vertices[i,j] == 0
-        if free_check and cross_check:
-            pass
-        else:
-            return False
-        #checks if the wall space is protected due to the blocking constraint
-        not_protected_check = not self.is_protected('v',((i,j),(i+1,j)))     
-        if not_protected_check:
-            return True
-        else:
-            return False
-    elif movetype == 'horizontal wall':
-        #checks if the wall spaces are free
-        free_check = self.board.walls_hor[i,j] == 0 and self.board.walls_hor[i,j+1] == 0
-        #checks if the wall would cross a horizontal wall
-        cross_check = self.board.vertices[i,j] == 0
-        if free_check and cross_check:
-            pass
-        else:
-            return False
-        #checks if the wall space is protected due to the blocking constraint
-        not_protected_check = not self.is_protected('h',((i,j),(i,j+1)))
-        if not_protected_check:
-            return True
-        else:
-            return False
-    #normal piece move - check not either at edge or blocked by a wall or player piece
-    elif movetype == 'regular move':
-        if direction == (1,0): #downwards move
-            if pos[0] != 8 and self.board.walls_hor[pos] == 0 and self.board.squares[pos[0]+1,pos[1]] == 0:
+        
+    def is_legal(self,movetype,direction=None,locations=None):
+        #checks if the chosen move is a legal move
+        if locations is not None:
+            i = locations[0][0]
+            j = locations[0][1]
+        if 'wall' in movetype:
+            wall_direction = movetype[0]
+            if self.turn_player.walls == 0:
+                return False
+        pos = self.turn_player.position
+        
+        #wall moves
+        if movetype == 'vertical wall':
+            #checks if the wall spaces are free
+            free_check = self.board.walls_vert[i,j] == 0 and self.board.walls_vert[i+1,j] == 0
+            #checks if the wall would cross a horizontal wall
+            cross_check = self.board.vertices[i,j] == 0
+            if free_check and cross_check:
+                pass
+            else:
+                return False
+            #checks if the wall space is protected due to the blocking constraint
+            not_protected_check = not self.is_protected('v',((i,j),(i+1,j)))     
+            if not_protected_check:
                 return True
             else:
                 return False
-        elif direction == (-1,0): #upwards move
-            if pos[0] != 0 and self.board.walls_hor[(pos[0],pos[1]-1)] == 0 and self.board.squares[pos[0]-1,pos[1]] == 0:
+        elif movetype == 'horizontal wall':
+            #checks if the wall spaces are free
+            free_check = self.board.walls_hor[i,j] == 0 and self.board.walls_hor[i,j+1] == 0
+            #checks if the wall would cross a horizontal wall
+            cross_check = self.board.vertices[i,j] == 0
+            if free_check and cross_check:
+                pass
+            else:
+                return False
+            #checks if the wall space is protected due to the blocking constraint
+            not_protected_check = not self.is_protected('h',((i,j),(i,j+1)))
+            if not_protected_check:
                 return True
             else:
                 return False
-        elif direction == (0,1): #right move
-            if self.turn_player.position[1] != 8 and self.board.walls_vert[pos] == 0 and self.board.squares[pos[0], pos[1]+1] == 0:
-                return True
-            else: 
-                return False
-        else: #left move
-            if self.turn_player.position[1] != 0 and self.board.walls_vert[pos[0],pos[1]-1] == 0 and self.board.squares[pos[0], pos[1]-1] == 0:
-                return True
+        #normal piece move - check not either at edge or blocked by a wall or player piece
+        elif movetype == 'regular move':
+            if direction == (1,0): #downwards move
+                if pos[0] != 8 and self.board.walls_hor[pos] == 0 and self.board.squares[pos[0]+1,pos[1]] == 0:
+                    return True
+                else:
+                    return False
+            elif direction == (-1,0): #upwards move
+                if pos[0] != 0 and self.board.walls_hor[(pos[0],pos[1]-1)] == 0 and self.board.squares[pos[0]-1,pos[1]] == 0:
+                    return True
+                else:
+                    return False
+            elif direction == (0,1): #right move
+                if self.turn_player.position[1] != 8 and self.board.walls_vert[pos] == 0 and self.board.squares[pos[0], pos[1]+1] == 0:
+                    return True
+                else: 
+                    return False
+            else: #left move
+                if self.turn_player.position[1] != 0 and self.board.walls_vert[pos[0],pos[1]-1] == 0 and self.board.squares[pos[0], pos[1]-1] == 0:
+                    return True
+                else:
+                    return False
+        #double piece move - check at least two spaces from edge and is blocked by player piece and not blocked by walls 1 or 2 spaces away
+        elif movetype == 'straight jump':    
+            if direction == (2,0):
+                if pos[0] > 7 and self.board.squares[pos[0]+1,pos[1]] != 0 and self.board.walls_hor[pos] == 0 and self.board.walls_hor[pos[0]+1, pos[1]] == 0:
+                    return True
+                else:
+                    return False   
             else:
-                return False
-    #double piece move - check at least two spaces from edge and is blocked by player piece and not blocked by walls 1 or 2 spaces away
-    elif movetype == 'straight jump':                      
-        return False
-    #diagonal piece move - check not at least 2 spaces from edge, and blocked by player with wall piece behind
-    #NB: FOR EACH DIAGONAL MOVE, THERE ARE TWO WAYS TO ACHIEVE - (eg. diag down left blocked by player down or to the left)
-    elif movetype == 'diagonal jump':
-        return False
+                return False               
+        #diagonal piece move - check not at least 2 spaces from edge, and blocked by player with wall piece behind
+        #NB: FOR EACH DIAGONAL MOVE, THERE ARE TWO WAYS TO ACHIEVE - (eg. diag down left blocked by player down or to the left)
+        elif movetype == 'diagonal jump':
+            return False
 
-def is_protected(self,wall_direction,locations):
-    #check whether a wall location is protected by the blocking constraint
-    protected = False
-    self.place_wall(wall_direction,locations)
-    for player in self.players:
-        if find_route(player):
-            pass
+    def is_protected(self,wall_direction,locations):
+        #check whether a wall location is protected by the blocking constraint
+        protected = False
+        self.place_wall(wall_direction,locations)
+        for player in self.players:
+            print(player)
+            if self.find_route(player):
+                pass
+            else:
+                protected = True
+        self.remove_wall(wall_direction, locations)
+        return protected
+
+
+    def set_grid(self, player):
+        #sets up a grid to use for the search algorithm
+        grid = np.zeros((9,9))
+        if player.player == 1:
+            grid[8,:] = 2
         else:
-            protected = True
-    self.remove_wall(wall_direction, locations)
-    return protected
+            grid[0,:] = 2
+        return grid
+        
+    def find_route(self,player):
+        #maze search to find the quickest route for the player to the finish
+        #will return None if there is no possible route to the finish
+        grid = self.set_grid(player)
+        route = self.search(player.position[0],player.position[1],grid)
+        return route
 
-
-def set_grid(player):
-    #sets up a grid to use for the search algorithm
-    grid = np.zeros((9,9))
-    if player.player == 1:
-        grid[8,:] = 2
-    else:
-        grid[0,:] = 2
-    return grid
-    
-def find_route(player):
-    #maze search to find the quickest route for the player to the finish
-    #will return None if there is no possible route to the finish
-    grid = set_grid(player)
-    route = search(player.position[0],player.position[1],grid)
-    return route
-
-def search(self,i,j,grid):
-    #searches for a possible route from a given x and y to the goal side of a grid
-    if grid[(i,j)] == 2: #2 = reached the other side
+    def search(self,i,j,grid):
+        #searches for a possible route from a given x and y to the goal side of a grid
+        if grid[(i,j)] == 2: #2 = reached the other side
+                return True
+        elif grid[(i,j)] == 3: #3 = already visited square
+            return False
+        
+        grid[(i,j)] = 3 #set square to visited
+        
+        if (((i > 0) and (self.board.walls_hor[(i-1,j)]==0) and (self.search(i-1,j,grid))) or 
+            ((j < 8) and (self.board.walls_vert[i,j]==0) and self.search(i,j+1,grid)) or 
+            ((i < 8) and (self.board.walls_hor[i,j]==0) and self.search(i+1,j,grid)) or 
+            ((j > 0) and (self.board.walls_vert[(i,j-1)]==0) and self.search(i,j-1,grid))):
             return True
-    elif grid[(i,j)] == 3: #3 = already visited square
+        
         return False
-    
-    grid[(i,j)] = 3 #set square to visited
-    
-    if (((i > 0) and (self.board.hor_walls[(i-1,j)]==0) and (self.search(i-1,j))) or 
-        ((j < 2) and (self.board.vert_walls[i,j]==0) and self.search(i,j+1)) or 
-        ((i < 2) and (self.board.hor_walls[i,j]==0) and self.search(i+1,j)) or 
-        ((j > 0) and (self.board.vert_walls[(i,j-1)]==0) and self.search(i,j+1))):
-        return True
-    
-    return False
 
 
 

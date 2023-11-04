@@ -16,30 +16,38 @@ class agent():
         self.gamma = 0 #discount rate
         self.memory = deque(maxlen=MAX_MEMORY) #popleft()
         self.model = model.Linear_QNet(290,140,500)
-        self.trainer = model.QTrainer(self.p1_model, self.gamma, LR)
+        self.trainer = model.QTrainer(self.model, self.gamma, LR)
         self.player = player
 
     def get_state(self, game):
-        state = np.concatenate(game.board.squares,game.board.walls_vert,game.board.walls_hor,game.board.vertices,self.player, axis=None)
+        state = np.concatenate([game.board.squares,game.board.walls_vert,game.board.walls_hor,game.board.vertices,self.player], axis=None)
         return state
     
-    def get_action(self, state, game, player):
-        self.epsilon = 1000 - self.num_games
+    def get_action(self, state, game):
+        self.epsilon = 150 - self.number_of_games
         final_move = np.zeros(140)
             
         if np.random.randint(0,200) < self.epsilon:
-            move_nums = np.random.shuffle(np.arange(140))
-            while True:
-                i = 0
+            move_nums = np.arange(140)
+            np.random.shuffle(move_nums)
+            for i in range(len(move_nums)):
                 movetype, direction, locations = game.get_action_vars(move_nums[i])
                 if game.is_legal(movetype, direction, locations):
-                    return 
-                i += 1
+                    final_move[move_nums[i]] = 1
+                    return final_move, movetype, direction, locations
         else:
-            pass
+            state0 = torch.tensor(state, dtype=torch.float)
+            prediction = self.model(state0)
+            prediction_sorted = np.argsort(prediction.detach().numpy())
+            for i in range(len(prediction_sorted)):
+                movetype, direction, locations = game.get_action_vars(prediction_sorted[i])
+                if game.is_legal(movetype, direction, locations):
+                    final_move[prediction_sorted[i]] = 1
+                    return final_move, movetype, direction, locations
 
+                
     def read_state_dict(self, state_dict):
-        self.model = model.Linear_QNet().load_state_dict(state_dict)
+        self.model = self.model.load_state_dict(state_dict)
 
     def remember(self,state, action, reward, next_state, game_over):
         self.memory.append([state,action,reward,next_state,game_over])
@@ -63,22 +71,26 @@ def train():
     agent_2 = agent(2)
 
     while True:
+        #reset reward
+        reward = 0
+
         #if it is the first move, and the learning agent is p2, do a move 
         if agent_1.player == 2 and game.turn == 0:
-            game.play_step(agent_2.get_action(agent_2.get_state(game)))
+            move, mtype, dir, loc = agent_2.get_action(agent_2.get_state(game),game)
+            game.play_step(mtype, dir, loc)
 
         #get old state
         state_old = agent_1.get_state(game)
 
         #get move
-        final_move = agent_1.get_action(state_old)
+        final_move, movetype, direction, locations = agent_1.get_action(state_old, game)
 
         #perform move and get interim state
-        game_over, p1_reward, p2_reward = game.play_step(final_move)
+        game_over, p1_reward, p2_reward = game.play_step(movetype, direction, locations)
         rewards = [p1_reward, p2_reward]
         reward += rewards[agent_1.player - 1]
 
-        state_new = agent.get_state(game)
+        state_new = agent_1.get_state(game)
 
         #remember
         agent_1.remember(state_old, final_move, reward, state_new, game_over)
@@ -89,13 +101,14 @@ def train():
 
             agent_1.player = np.random.randint(1,3)
             agent_2.player = (agent_1.player % 2) + 1
-            agent_1.number_of_games, agent_2.number_of_games += 1
+            agent_1.number_of_games += 1
+            agent_2.number_of_games += 1
         
         else:
 
             #opponent agent plays move, get the final state for the 'turn'
-            opp_move = agent_2.get_action(state_new)
-            game_over, p1_reward, p2_reward= game.play_step(opp_move)
+            opp_move, movetype, direction, locations = agent_2.get_action(state_new, game)
+            game_over, p1_reward, p2_reward= game.play_step(movetype, direction, locations)
 
 
             if game_over:
@@ -107,22 +120,11 @@ def train():
 
                 agent_1.player = np.random.randint(1,3)
                 agent_2.player = (agent_1.player % 2) + 1
-                agent_1.number_of_games, agent_2.number_of_games += 1
+                agent_1.number_of_games += 1
+                agent_2.number_of_games += 1
                 
 
-        #reset reward
-        reward = 0
 
-
-
-#prediction_values = np.argsort
-#while True:
-#   i = 0
-#   if move_vector[prediction_values[0]] == 1
-#       action = prediction_values[0]
-#       break
-#   else:
-#       i += 1
 
 #also TO DO: Save state dicts, update the opponent's model every so often so
 #the opponent also improves during training
